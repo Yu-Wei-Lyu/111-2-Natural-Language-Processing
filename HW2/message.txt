@@ -1,0 +1,112 @@
+import nltk
+import random
+from nltk.corpus import conll2002
+
+# 讀取 Conll 檔案
+def read_conll_file(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    sentences = []
+    sentence = []
+    string = ""
+    for line in lines:
+        line = line.strip()
+        string += line + "\n"
+        if not line:
+            if sentence:
+                sentences.append(sentence)
+                sentence = []
+        elif (len(line.split("\t")) > 1):
+            token, ner_tag = line.split("\t")
+            sentence.append((token, ner_tag))
+    if sentence:
+        sentences.append(sentence)
+    return sentences
+
+# 提取特徵
+def word_features(word):
+    return {'word': word}
+
+# 轉換標籤格式
+def conll_tags2nltk_tags(sentences):
+    nltk_sentences = []
+    for sentence in sentences:
+        nltk_sentence = []
+        for token, ner_tag in sentence:
+            nltk_sentence.append((token, ner_tag.split('-')[1] if '-' in ner_tag else 'O'))
+        nltk_sentences.append(nltk_sentence)
+    return nltk_sentences
+
+# 訓練 NER 模型
+def train_ner_model(train_sents):
+    # 提取特徵
+    features = []
+    for sentence in train_sents:
+        for word, tag in sentence:
+            features.append((word_features(word), tag))
+    # 隨機打亂特徵順序
+    random.shuffle(features)
+    # 分割特徵集和標籤集
+    X, y = zip(*features)
+    # 訓練分類器
+    classifier = nltk.NaiveBayesClassifier.train(list(zip(X, y)))
+    return classifier
+
+# 評估模型
+def evaluate_ner_model(classifier, test_sents):
+    # 提取特徵
+    features = []
+    for sentence in test_sents:
+        for word, tag in sentence:
+            features.append((word_features(word), tag))
+    # 預測標籤
+    y_pred = classifier.classify_many([f for f, _ in features])
+    # 真實標籤
+    y_true = [tag for _, tag in features]
+    
+    # 計算準確率
+    correct = sum(y_pred[i] == tag for i, (_, tag) in enumerate(features))
+    accuracy = correct / len(features)
+    
+    # 計算 Precision、Recall 和 F-measure
+    label_set = set(y_true + y_pred)
+    results = {}
+    for label in label_set:
+        true_positives = sum(y_pred[i] == label and y_true[i] == label for i in range(len(y_pred)))
+        false_positives = sum(y_pred[i] == label and y_true[i] != label for i in range(len(y_pred)))
+        false_negatives = sum(y_pred[i] != label and y_true[i] == label for i in range(len(y_pred)))
+
+        if ((label == "I-LOC") | (label == "I-PER") | (label == "I-ORG")):
+            print(label,"\n")
+            print(true_positives,false_negatives,false_positives,"\n")
+        
+        precision = true_positives / (true_positives + false_positives) if true_positives + false_positives > 0 else 0
+        recall = true_positives / (true_positives + false_negatives) if true_positives + false_negatives > 0 else 0
+        f_measure = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
+        
+
+        results[label] = {
+            'precision': precision,
+            'recall': recall,
+            'f_measure': f_measure
+        }
+    
+    return accuracy, results
+
+# 讀取訓練集和測試集
+train_file_path = './CONLL-format/data/f.conll'  # 訓練集檔案路徑
+test_file_path = './CONLL-format/data/g.conll'    # 測試集檔案路徑
+train_sents = read_conll_file(train_file_path)
+test_sents = read_conll_file(test_file_path)
+
+# 訓練 NER 模型
+classifier = train_ner_model(train_sents)
+
+# 評估模型
+accuracy, results = evaluate_ner_model(classifier, test_sents)
+print("Accuracy: {:.4f}".format(accuracy))
+for label, metrics in results.items():
+    print("Label: {}".format(label))
+    print("Precision: {:.4f}".format(metrics['precision']))
+    print("Recall: {:.4f}".format(metrics['recall']))
+    print("F-measure: {:.4f}".format(metrics['f_measure']))

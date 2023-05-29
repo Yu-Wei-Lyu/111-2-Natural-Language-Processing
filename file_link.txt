@@ -1,1 +1,7 @@
 https://drive.google.com/drive/folders/1hbgv2qFxHz4Jv9Gud-TyLIJwTWaQlsvH?usp=drive_link
+
+(3) Using word embedding for analogy prediction
+
+	首先，決定使用 GloVe 來對資料進行特徵化，這是一個 pre-train 的 word embedding，我們選用的檔案為 glove.6B.300d.txt，再來將其轉換為 word2Vec 以便之後的資料特徵化處理。
+	讀取檔案時，以遍歷檔案的方式，讀取 40 個小類別的資料，以第一字、第二字和標籤(檔案名稱)為一個資料單位，我們過濾了包含非英文單字(^[a-zA-Z]+$)的組合，以及如果是一對多的資料(例如: word1 word2/word3)拆分成一對一的形式，處理完以上操作後，將單個小類別的資料集打亂，並以 80% 的訓練集和 20% 的測試集做資料分割。
+	再來將訓練集和測試集的單字透過 GloVe 轉換為特徵向量，並將兩字的特徵向量串接方式合併成一個特徵向量，最後使用 SVC 進行分類的訓練和預測，得到 Accuracy: 0.8778930566640064。
